@@ -8,12 +8,12 @@ import logging
 import json
 import os
 
-from neutronclient.v2_0 import client as neutron_client
 from novaclient import client as nova_client
+from neutronclient.v2_0 import client as neutron_client
 from prettytable import PrettyTable
 from keystoneclient.v2_0 import client as keystone_client
 
-logging.basicConfig(date_fmt='%m-%d %H:%M', level=logging.DEBUG)
+logging.basicConfig(date_fmt='%m-%d %H:%M', level=logging.CRITICAL)
 LOG = logging.getLogger('InstanceInfo')
 
 class InstanceInfo:
@@ -34,7 +34,14 @@ class InstanceInfo:
     def get_interface_list(self, uuid):
         self._neutron = neutron_client.Client(endpoint_url=self._neutron_api, token=self._keystone.auth_token)
         ports = self._neutron.list_ports(device_id=uuid).get('ports', [])
-        print json.dumps(ports, indent=4)
+        #print json.dumps(ports, indent=4)
+        for port in ports:
+            print "Port ID: %s" % port['id'][:11]
+            print "Network ID: %s" % port['network_id']
+            print "Subnet ID: %s" % port['fixed_ips'][0]['subnet_id']
+            print "Mac Address: %s" % port['mac_address']
+            print "IP Address: %s\n" % port['fixed_ips'][0]['ip_address']
+            
 
     def get_keystone_creds(self):
         stack = dict(auth_url=os.environ.get('OS_AUTH_URL'),
