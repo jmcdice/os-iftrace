@@ -1,6 +1,7 @@
 #!/usr/bin/env python 
 #
-# Trace the hosting network stack for a particular VM in openstack.
+# Trace the hosting network stack for a particular VM.
+#
 # Joey <joey.mcdonald@nokia.com>
 
 import argparse
@@ -25,23 +26,25 @@ class InstanceInfo:
         self._keystone_creds = self.get_keystone_creds()
         self._keystone = keystone_client.Client(**self._keystone_creds)
         self._neutron_api = self._keystone.service_catalog.url_for(service_type='network', endpoint_type='internalURL')
-
-    def get_vm_info(self, uuid):
-        self._vm_obj = self._vm_info.servers.get(uuid)
-        self._dump = self._vm_obj.to_dict()
-        #print json.dumps(self._dump, indent=4)
-
-    def get_interface_list(self, uuid):
         self._neutron = neutron_client.Client(endpoint_url=self._neutron_api, token=self._keystone.auth_token)
-        ports = self._neutron.list_ports(device_id=uuid).get('ports', [])
-        #print json.dumps(ports, indent=4)
-        for port in ports:
-            print "Port ID: %s" % port['id'][:11]
-            print "Network ID: %s" % port['network_id']
-            print "Subnet ID: %s" % port['fixed_ips'][0]['subnet_id']
-            print "Mac Address: %s" % port['mac_address']
-            print "IP Address: %s\n" % port['fixed_ips'][0]['ip_address']
-            
+
+    def get_vm_nova_info(self, uuid):
+        self._vm_obj = self._vm_info.servers.get(uuid)
+        self._vm_dic = self._vm_obj.to_dict()
+        self._vm_keys = ['name', 'created', 'status', 'OS-EXT-SRV-ATTR:host']
+	table = PrettyTable(['VM Name', 'Created', 'Health/Status', 'Compute'])
+        table.add_row([self._vm_dic['name'], self._vm_dic['created'], self._vm_dic['status'], 
+		       self._vm_dic['OS-EXT-SRV-ATTR:host']])
+        return table
+
+    def get_vm_port_info(self, uuid):
+        self._ports = self._neutron.list_ports(device_id=uuid).get('ports', [])
+	table = PrettyTable(['Port ID', 'Network', 'Subnet', 'Mac Address', 'IP Address'])
+        for port in self._ports:
+            table.add_row([port['id'][:11], port['network_id'], port['fixed_ips'][0]['subnet_id'], 
+			   port['mac_address'], port['fixed_ips'][0]['ip_address']]) 
+
+        return table
 
     def get_keystone_creds(self):
         stack = dict(auth_url=os.environ.get('OS_AUTH_URL'),
@@ -53,12 +56,12 @@ class InstanceInfo:
 
 
     def get_nova_creds(self):
-        d = {}
-        d['username'] = os.environ['OS_USERNAME']
-        d['api_key'] = os.environ['OS_PASSWORD']
-        d['auth_url'] = os.environ['OS_AUTH_URL']
-        d['project_id'] = os.environ['OS_TENANT_NAME']
-        return d
+        creds = {}
+        creds['username'] = os.environ['OS_USERNAME']
+        creds['api_key'] = os.environ['OS_PASSWORD']
+        creds['auth_url'] = os.environ['OS_AUTH_URL']
+        creds['project_id'] = os.environ['OS_TENANT_NAME']
+        return creds
 
 
 if __name__ == '__main__':
@@ -66,9 +69,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Attempt to debug a guest VM interface.')
     parser.add_argument('--uuid', dest='instance', help='UUID for a specified running VM')
     args = parser.parse_args()
-
     uuid = args.instance
 
     guest = InstanceInfo(uuid)
-    #blob = guest.get_vm_info(uuid)
-    blob = guest.get_interface_list(uuid)
+
+    # Get nova information
+    nova_show = guest.get_vm_nova_info(uuid) 
+    print nova_show 
+    print "\n"
+   
+    # Get neutron information
+    net_show = guest.get_vm_port_info(uuid)
+    print net_show
