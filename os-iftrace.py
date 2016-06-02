@@ -46,6 +46,24 @@ class InstanceInfo:
 
         return table
 
+    def get_hosting_compute(self, uuid):
+        self._vm_obj = self._vm_info.servers.get(uuid)
+        self._vm_dic = self._vm_obj.to_dict()
+        #print json.dumps(self._vm_dic, indent=4)
+        return self._vm_dic['OS-EXT-SRV-ATTR:host']
+
+    def get_vm_port_path(self, uuid):
+        self._compute = guest.get_hosting_compute(uuid)
+        self._ports = self._neutron.list_ports(device_id=uuid).get('ports', [])
+        table = PrettyTable(['Compute', 'Mac Address', 'IP Address', 'Tap Interface', 'Linux Bridge', 'Veth0', 'Veth1'])
+        for port in self._ports:
+            self._id = port['id'][:11]
+	    self._mac = port['mac_address']
+	    self._ip = port['fixed_ips'][0]['ip_address']
+            table.add_row([self._compute, self._mac, self._ip, 'tap'+self._id, 'qbr'+self._id, 'qvb'+self._id, 'qvo'+self._id])
+
+        return table
+
     def get_keystone_creds(self):
         stack = dict(auth_url=os.environ.get('OS_AUTH_URL'),
                      username=os.environ.get('OS_USERNAME'),
@@ -53,7 +71,6 @@ class InstanceInfo:
                      password=os.environ.get('OS_PASSWORD'),
                      endpoint_type=os.environ.get('OS_ENDPOINT_TYPE', 'publicURL'))
         return stack
-
 
     def get_nova_creds(self):
         creds = {}
@@ -75,9 +92,11 @@ if __name__ == '__main__':
 
     # Get nova information
     nova_show = guest.get_vm_nova_info(uuid) 
-    print nova_show 
-    print "\n"
+    #print nova_show 
    
     # Get neutron information
     net_show = guest.get_vm_port_info(uuid)
-    print net_show
+    # print net_show
+
+    path_show = guest.get_vm_port_path(uuid)
+    print path_show
