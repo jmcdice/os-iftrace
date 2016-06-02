@@ -4,10 +4,7 @@
 #
 # Joey <joey.mcdonald@nokia.com>
 
-import argparse
-import logging
-import json
-import os
+import errno, sys, argparse, logging, json, os
 
 from novaclient import client as nova_client
 from neutronclient.v2_0 import client as neutron_client
@@ -73,11 +70,18 @@ class InstanceInfo:
         return stack
 
     def get_nova_creds(self):
+        try:
+            sourced = os.environ['OS_USERNAME']
+        except KeyError:
+            print "Please source OpenStack admin credentials."
+            sys.exit(errno.EPERM)
+
         creds = {}
         creds['username'] = os.environ['OS_USERNAME']
         creds['api_key'] = os.environ['OS_PASSWORD']
         creds['auth_url'] = os.environ['OS_AUTH_URL']
         creds['project_id'] = os.environ['OS_TENANT_NAME']
+
         return creds
 
 
@@ -85,6 +89,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Attempt to debug a guest VM interface.')
     parser.add_argument('--uuid', dest='instance', help='UUID for a specified running VM')
+    parser.add_argument('--tcpdump', dest='dumpif', help='Interface to dump')
     args = parser.parse_args()
     uuid = args.instance
 
