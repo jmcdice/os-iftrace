@@ -84,24 +84,42 @@ class InstanceInfo:
 
         return creds
 
+def checktcpdump_binary(compute):
+    print "Checking for tcpdump on host %s" % compute  
+    #ret = os.system("ssh -q %s tcpdump -h" % compute)
+    ret = os.system("ssh -q %s 'tcpdump -h' 2>&1 |grep -q libpcap" % compute)
+    if ret != 0:
+        print "tcpdump is not installed on host: %s" % compute
+        exit(1)
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Attempt to debug a guest VM interface.')
     parser.add_argument('--uuid', dest='instance', help='UUID for a specified running VM')
-    parser.add_argument('--tcpdump', dest='dumpif', help='Interface to dump')
+    parser.add_argument('--tcpdump', dest='interface', help='Interface to dump')
     args = parser.parse_args()
     uuid = args.instance
+    interface = args.interface
 
     guest = InstanceInfo(uuid)
 
+
     # Get nova information
     nova_show = guest.get_vm_nova_info(uuid) 
-    #print nova_show 
+    # print nova_show 
    
     # Get neutron information
     net_show = guest.get_vm_port_info(uuid)
     # print net_show
 
-    path_show = guest.get_vm_port_path(uuid)
-    print path_show
+    iftable = guest.get_vm_port_path(uuid)
+
+    if not interface:
+        print iftable
+        exit(0)
+
+    if interface:
+        compute = guest.get_hosting_compute(uuid)
+        checktcpdump_binary(compute)
+	print "Dumping %s on %s" % (interface, compute)
+
