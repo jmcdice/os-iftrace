@@ -1,10 +1,12 @@
 #!/usr/bin/env python 
 #
 # Trace the hosting network stack for a particular VM.
-#
+# Dump a 30 second packet capture for a specified interface.
 # Joey <joey.mcdonald@nokia.com>
 
 import errno, sys, argparse, logging, json, os
+import subprocess
+import time
 
 from novaclient import client as nova_client
 from neutronclient.v2_0 import client as neutron_client
@@ -85,12 +87,27 @@ class InstanceInfo:
         return creds
 
 def checktcpdump_binary(compute):
-    print "Checking for tcpdump on host %s" % compute  
-    #ret = os.system("ssh -q %s tcpdump -h" % compute)
+    # print "Checking for tcpdump on host %s" % compute  
     ret = os.system("ssh -q %s 'tcpdump -h' 2>&1 |grep -q libpcap" % compute)
     if ret != 0:
         print "tcpdump is not installed on host: %s" % compute
         exit(1)
+
+def tcpdump(compute, interface):
+    print "Dumping 30 second packet capture interface: %s on %s" % (interface, compute)
+    pcap = compute + '-' + interface + '.pcap'
+    dumpcmd = 'tcpdump -i %s -w /tmp/%s -s 1000' % (interface, pcap)
+
+    proc = subprocess.Popen(['ssh', '-q', "%s" % compute, dumpcmd],  
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
+    time.sleep(30)
+    proc.terminate()
+    proc.wait()
+
+    print "pcap file: %s:/tmp/%s" % (compute, pcap)
+
+
 
 if __name__ == '__main__':
 
@@ -121,5 +138,4 @@ if __name__ == '__main__':
     if interface:
         compute = guest.get_hosting_compute(uuid)
         checktcpdump_binary(compute)
-	print "Dumping %s on %s" % (interface, compute)
-
+        tcpdump(compute, interface)
