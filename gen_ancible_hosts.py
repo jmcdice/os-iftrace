@@ -1,7 +1,7 @@
 #!/usr/bin/env python 
 # Joey <joey.mcdonald@nokia.com>
 
-import argparse, os, json
+import argparse, os, json, re
 from pprint import pprint
 from novaclient import client as nova_client
 from keystoneclient.v2_0 import client as keystone_client
@@ -17,11 +17,32 @@ class InstanceInfo:
 
     def get_vm_nova_info(self):
         client_list = self._vm_info.servers.list()
+	compute = []
+        cephserver = []
+	controller = []
+        
         for server in client_list:
             #pprint (vars(server))
             for address in server.addresses.values():
                for ip in address:
-                  print server.name, ip['addr']
+		  server_type = re.compile("overcloud-(.*)-\d")
+		  stype = server_type.findall(server.name)
+		  if stype[0] == 'compute':
+		     compute.append(ip['addr'])
+		  if stype[0] == 'cephstorage':
+		     cephserver.append(ip['addr'])
+		  if stype[0] == 'controller':
+		     controller.append(ip['addr'])
+
+        print '[compute]'
+        for ip in compute:
+           print ip
+        print '[cephstorage]'
+        for ip in cephserver:
+           print ip
+        print '[controller]'
+        for ip in controller:
+           print ip
 
     def get_keystone_creds(self):
         stack = dict(auth_url=os.environ.get('OS_AUTH_URL'),
